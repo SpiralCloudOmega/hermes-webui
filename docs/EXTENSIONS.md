@@ -351,15 +351,18 @@ written into CSS, every value is sanitized in core, once, so every theme
 extension inherits the guard:
 
 - **Allowed token names** (anything else is dropped): `--bg`, `--surface`,
-  `--surface2`, `--text`, `--text2`, `--muted`, `--accent`, `--accent2`,
-  `--accent3`, `--accent-contrast`, `--border`, `--border2`, `--hover-bg`,
-  `--code-bg`, `--code-text`, `--sidebar`, `--sidebar-text`, `--user-bubble`,
-  `--assistant-bubble`, `--success`, `--warning`, `--danger`, `--info`, `--link`.
+  `--surface2`, `--surface-subtle`, `--text`, `--text2`, `--muted`, `--accent`,
+  `--accent2`, `--accent3`, `--accent-contrast`, `--accent-hover`,
+  `--accent-text`, `--accent-bg`, `--accent-bg-strong`, `--accent-rgb`,
+  `--border`, `--border2`, `--hover-bg`, `--code-bg`, `--code-text`,
+  `--sidebar`, `--sidebar-text`, `--user-bubble`, `--assistant-bubble`,
+  `--success`, `--warning`, `--danger`, `--info`, `--link`.
 - **Allowed value shapes** (anything else is dropped): hex colors, `rgb()` /
-  `rgba()`, `hsl()` / `hsla()`, CSS color keywords, and simple
-  numeric-with-unit values (`px`/`em`/`rem`/`%`). Values containing `url()`,
-  `expression()`, semicolons, braces, or other CSS-injection vectors are
-  rejected.
+  `rgba()`, `hsl()` / `hsla()`, CSS color keywords, simple numeric-with-unit
+  values (`px`/`em`/`rem`/`%`), and a bare RGB triple (e.g. `0, 0, 0` for
+  `--accent-rgb`, which the app consumes inside `rgba(...)`). Values containing
+  `url()`, `expression()`, semicolons, braces, or other CSS-injection vectors
+  are rejected.
 - **Reserved keys are protected** — an extension cannot overwrite a built-in
   skin key (e.g. `default`, `ares`, `graphite`).
 - A descriptor with no valid tokens after sanitization is rejected entirely.

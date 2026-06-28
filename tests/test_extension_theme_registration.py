@@ -45,6 +45,31 @@ def test_reserved_core_skins_are_guarded():
     )
 
 
+def test_pending_extension_skin_is_preserved_across_boot():
+    """A persisted skin that isn't a known core skin (i.e. an extension skin
+    not yet registered at boot) must NOT be clobbered to 'default' by the
+    boot-time appearance sync, or it won't survive a reload."""
+    assert "lsSkinIsPendingExt" in BOOT_JS, (
+        "boot sync must detect a pending (unregistered) extension skin"
+    )
+    # the boot sync must keep the raw ls value for a pending ext skin
+    assert "lsSkinIsPendingExt?lsSkin:lsAppearance.skin" in BOOT_JS, (
+        "boot sync must preserve the raw pending-ext skin instead of normalizing it away"
+    )
+
+
+INDEX_HTML = (REPO / "static" / "index.html").read_text(encoding="utf-8")
+
+
+def test_prepaint_inline_script_preserves_unknown_skin():
+    """The pre-paint inline script in index.html must also preserve an unknown
+    persisted skin (a likely extension skin) rather than resetting localStorage
+    to 'default' before boot.js / the extension runs."""
+    assert "pendingExt" in INDEX_HTML, (
+        "pre-paint script must detect a pending extension skin and keep it"
+    )
+
+
 # ── Layer 2: behavioral (Node harness drives the real functions) ─────────────
 
 _HARNESS = r"""

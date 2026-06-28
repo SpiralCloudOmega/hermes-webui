@@ -2013,15 +2013,17 @@ const _RESERVED_SKIN_KEYS=new Set((_SKINS||[]).map(s=>(s.value||s.name).toLowerC
 // CSS custom-property names a skin is allowed to set. Mirrors the documented
 // design-token contract; anything outside this set is dropped.
 const _ALLOWED_SKIN_TOKENS=new Set([
-  '--bg','--surface','--surface2','--text','--text2','--muted',
-  '--accent','--accent2','--accent3','--accent-contrast',
+  '--bg','--surface','--surface2','--surface-subtle','--text','--text2','--muted',
+  '--accent','--accent2','--accent3','--accent-contrast','--accent-hover',
+  '--accent-text','--accent-bg','--accent-bg-strong','--accent-rgb',
   '--border','--border2','--hover-bg','--code-bg','--code-text',
   '--sidebar','--sidebar-text','--user-bubble','--assistant-bubble',
   '--success','--warning','--danger','--info','--link'
 ]);
-// Accept only safe color / simple numeric-with-unit values. Rejects anything
+// Accept only safe color / simple numeric-with-unit values, OR a bare RGB triple
+// (e.g. "0, 0, 0" for --accent-rgb, consumed inside rgba(...)). Rejects anything
 // with url(), expression(), semicolons, braces, or other CSS-injection vectors.
-const _SAFE_SKIN_VALUE_RE=/^(#(?:[0-9a-fA-F]{3,8})|rg(?:b|ba)\(\s*[0-9.,%\s/]+\)|hsl(?:a)?\(\s*[0-9.,%\s/deg]+\)|[a-zA-Z]{3,20}|[0-9.]+(?:px|em|rem|%)?)$/;
+const _SAFE_SKIN_VALUE_RE=/^(#(?:[0-9a-fA-F]{3,8})|rg(?:b|ba)\(\s*[0-9.,%\s/]+\)|hsl(?:a)?\(\s*[0-9.,%\s/deg]+\)|[0-9]{1,3}\s*,\s*[0-9]{1,3}\s*,\s*[0-9]{1,3}|[a-zA-Z]{3,20}|[0-9.]+(?:px|em|rem|%)?)$/;
 
 function _sanitizeSkinTokens(tokens){
   const out={};
@@ -2299,17 +2301,26 @@ window._applyTitlebarProfileVisibility=_applyTitlebarProfileVisibility;
     const lsTheme=(localStorage.getItem('hermes-theme')||'').trim().toLowerCase();
     const lsSkin=(localStorage.getItem('hermes-skin')||'').trim().toLowerCase();
     const lsAppearance=_normalizeAppearance(lsTheme||null,lsSkin||null);
+    // An unknown non-default persisted skin is most likely an extension-provided
+    // skin (registerHermesSkin) whose extension script hasn't registered it yet
+    // at this point in boot. Preserve it verbatim instead of normalizing it away
+    // to 'default' — the extension's registerHermesSkin() will inject the CSS and
+    // re-apply it once it loads. Without this, the boot sync would clobber the
+    // saved choice before the extension runs.
+    const lsSkinIsPendingExt=!!lsSkin&&lsSkin!=='default'&&!_VALID_SKINS.has(lsSkin)&&!_LEGACY_THEME_MAP[lsSkin];
     const lsHasExplicitSkin=lsSkin&&lsSkin!=='default';
     const lsHasExplicitTheme=lsTheme&&['system','light','dark'].includes(lsTheme);
     const theme=lsHasExplicitTheme?lsAppearance.theme:srvAppearance.theme;
-    const skin=lsHasExplicitSkin?lsAppearance.skin:srvAppearance.skin;
+    const skin=lsHasExplicitSkin?(lsSkinIsPendingExt?lsSkin:lsAppearance.skin):srvAppearance.skin;
     localStorage.setItem('hermes-theme',theme);
     _applyTheme(theme);
     localStorage.setItem('hermes-skin',skin);
     _applySkin(skin);
     // Reconcile: if localStorage and server disagree, push localStorage
-    // values to the server so the next refresh won't revert.
-    if((lsHasExplicitTheme||lsHasExplicitSkin)&&(theme!==srvAppearance.theme||skin!==srvAppearance.skin)){
+    // values to the server so the next refresh won't revert. Skip the push for a
+    // still-pending extension skin (don't persist it server-side until it's a
+    // confirmed-registered skin — avoids writing a skin the server can't validate).
+    if((lsHasExplicitTheme||lsHasExplicitSkin)&&!lsSkinIsPendingExt&&(theme!==srvAppearance.theme||skin!==srvAppearance.skin)){
       try{
         api('/api/settings',{method:'POST',body:JSON.stringify({theme,skin})});
       }catch(_){}
