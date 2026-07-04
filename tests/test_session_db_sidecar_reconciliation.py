@@ -120,6 +120,33 @@ def test_recover_missing_sidecars_skips_durable_delete_tombstone_without_index(t
     )
 
 
+def test_audit_skips_index_missing_file_when_durable_delete_tombstone_survives(tmp_path, monkeypatch):
+    import api.models as _m
+
+    sid = "durable_deleted_index_001"
+    _write_index(tmp_path, [
+        {
+            "session_id": sid,
+            "source_tag": "webui",
+            "raw_source": "webui",
+            "session_source": "webui",
+        }
+    ])
+    monkeypatch.setattr(_m, "SESSION_DIR", tmp_path)
+    _m._record_webui_deleted_session_tombstone(sid)
+
+    report = audit_session_recovery(tmp_path)
+
+    assert not any(
+        item["session_id"] == sid and item["kind"] == "index_missing_file"
+        for item in report["items"]
+    )
+    assert not any(
+        item["session_id"] == sid and item["category"] == "repairable"
+        for item in report["items"]
+    )
+
+
 def test_recover_missing_sidecars_from_state_db_skips_existing_sidecar(tmp_path):
     sid = _make_state_db(tmp_path / "state.db")
     existing = tmp_path / f"{sid}.json"

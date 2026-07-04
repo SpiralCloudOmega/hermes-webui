@@ -574,7 +574,11 @@ def _read_index_session_ids(index_path: Path) -> set[str]:
 
 
 def _index_marks_deleted_webui_session(session_dir: Path, sid: str) -> bool:
-    """Return True when _index.json marks sid as a deleted WebUI session."""
+    """Return True when _index.json has a WebUI-like entry whose sidecar is missing.
+
+    This is a delete-route heuristic for cases where index pruning and durable
+    tombstone recording both failed; it can also match other sidecar-loss modes.
+    """
     if not sid or (session_dir / f"{sid}.json").exists():
         return False
     index_path = session_dir / '_index.json'
@@ -711,7 +715,10 @@ def audit_session_recovery(session_dir: Path, state_db_path: Path | None = None)
     if index_path.exists():
         index_ids = _read_index_session_ids(index_path)
         for session_id in sorted(index_ids - live_ids):
-            if session_id in state_db_deleted_webui_ids:
+            if (
+                session_id in state_db_deleted_webui_ids
+                or _durable_tombstone_marks_deleted_webui_session(session_dir, session_id)
+            ):
                 continue
             items.append(_new_audit_item(
                 session_id, "index_missing_file", "repairable", "rebuild_index"
