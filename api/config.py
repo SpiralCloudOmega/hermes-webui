@@ -2572,6 +2572,13 @@ def resolve_model_provider(model_id: str) -> tuple:
         for slug, pdef in providers_cfg.items():
             if not isinstance(pdef, dict):
                 continue
+            # Copilot is the documented exception: `providers.copilot.models` is
+            # a per-model SETTINGS map (reasoning_effort, limits, etc.), NOT a
+            # routable allowlist (see the exception at the catalog-build site).
+            # Scanning it here would let a Copilot per-model settings entry
+            # hijack that model's routing away from its real provider (#5511).
+            if _canonicalise_provider_id(slug) == "copilot":
+                continue
             p_models = pdef.get('models')
             if isinstance(p_models, list):
                 for m in p_models:

@@ -748,3 +748,68 @@ def test_bare_custom_provider_no_base_url_with_known_prefix_keeps_custom_and_ful
     )
     assert model == 'google/gemma-2-9b'
     assert base_url is None
+
+
+# ── providers: (config.yaml user-defined provider) scan (#5511) ─────────────
+
+def _resolve_with_providers(model_id, providers_cfg, *, provider=None, default=None):
+    """Helper: temporarily set config.cfg['providers'] + model, call resolve, restore."""
+    old_cfg = dict(config.cfg)
+    model_cfg = {}
+    if provider:
+        model_cfg['provider'] = provider
+    if default:
+        model_cfg['default'] = default
+    config.cfg['model'] = model_cfg
+    config.cfg['providers'] = providers_cfg
+    try:
+        return config.resolve_model_provider(model_id)
+    finally:
+        config.cfg.clear()
+        config.cfg.update(old_cfg)
+
+
+def test_providers_scan_routes_user_defined_allowlist_5511():
+    """A user-defined providers.<slug>.models allowlist routes a bare model id
+    to that provider (the feature #5511 adds)."""
+    model, provider, base_url = _resolve_with_providers(
+        'my-model-1',
+        {'myprov': {'base_url': 'https://my.example/v1', 'models': ['my-model-1', 'my-model-2']}},
+        provider='openai',
+        default='gpt-5',
+    )
+    assert provider == 'myprov', f"user-defined provider allowlist must route; got {provider!r}"
+    assert model == 'my-model-1'
+    assert base_url == 'https://my.example/v1'
+
+
+def test_providers_scan_skips_copilot_settings_map_5511():
+    """providers.copilot.models is a per-model SETTINGS map, NOT a routable
+    allowlist — a Copilot per-model settings entry must NOT hijack routing away
+    from the model's real provider (#5511 gate-cert CORE finding)."""
+    model, provider, base_url = _resolve_with_providers(
+        'gpt-5',
+        {'copilot': {'models': {'gpt-5': {'reasoning_effort': 'high'}}}},
+        provider='openai',
+        default='gpt-5',
+    )
+    assert provider == 'openai', (
+        "Copilot settings-map entry must NOT hijack routing; "
+        f"gpt-5 must stay on openai, got {provider!r}"
+    )
+    assert model == 'gpt-5'
+
+
+def test_providers_scan_copilot_list_shape_also_skipped_5511():
+    """Defense in depth: even if providers.copilot.models is a list shape, the
+    Copilot exclusion still prevents a routing hijack."""
+    model, provider, base_url = _resolve_with_providers(
+        'gpt-5',
+        {'copilot': {'models': ['gpt-5', 'gpt-5-mini']}},
+        provider='openai',
+        default='gpt-5',
+    )
+    assert provider == 'openai', (
+        f"Copilot (list shape) must not hijack routing; got {provider!r}"
+    )
+    assert model == 'gpt-5'
