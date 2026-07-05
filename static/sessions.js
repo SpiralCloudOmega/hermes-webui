@@ -4251,6 +4251,17 @@ function _invalidateSessionListRenders(){
   _renderSessionListGen++;
   _pendingSessionListPayload = null;
   _renderSessionListQueuedRequest = null;
+  // A retry whose fetch is invalidated here (e.g. a profile switch mid-retry)
+  // would otherwise leave the error note stuck as an inert "Retrying…" button
+  // with no request in flight — the stale fetch returns before
+  // _showSessionListLoadError and the .finally() bails when the old button was
+  // removed. Clear the pending retry markers so the next repaint shows an
+  // actionable idle Retry again.
+  if(_sessionListLoadError && (_sessionListLoadError.retrying || _sessionListLoadError._retryFailedFocus)){
+    _sessionListLoadError = {..._sessionListLoadError};
+    delete _sessionListLoadError.retrying;
+    delete _sessionListLoadError._retryFailedFocus;
+  }
 }
 if(typeof window!=='undefined') window._invalidateSessionListRenders = _invalidateSessionListRenders;
 
